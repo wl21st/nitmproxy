@@ -8,6 +8,7 @@ import io.netty.channel.ChannelHandlerContext;
 
 public class HttpProxyHandler extends ChannelHandlerAdapter {
     private NitmProxyMaster master;
+
     private ConnectionInfo connectionInfo;
 
     public HttpProxyHandler(NitmProxyMaster master, ConnectionInfo connectionInfo) {

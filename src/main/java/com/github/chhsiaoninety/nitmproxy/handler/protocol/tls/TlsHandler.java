@@ -1,5 +1,11 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.tls;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import javax.net.ssl.SSLException;
+
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyMaster;
 import com.github.chhsiaoninety.nitmproxy.enums.Handler;
@@ -15,24 +21,20 @@ import io.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 public class TlsHandler extends ChannelOutboundHandlerAdapter {
     private static final Logger LOGGER = LoggerFactory.getLogger(TlsHandler.class);
 
-    private NitmProxyMaster master;
-    private ConnectionInfo connectionInfo;
-    private Channel outboundChannel;
-    private boolean client;
-
     private final List<Object> pendings;
 
-    public TlsHandler(NitmProxyMaster master,
-                      ConnectionInfo connectionInfo, Channel outboundChannel,
-                      boolean client) {
+    private NitmProxyMaster master;
+
+    private ConnectionInfo connectionInfo;
+
+    private Channel outboundChannel;
+
+    private boolean client;
+
+    public TlsHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel, boolean client) {
         this.master = master;
         this.connectionInfo = connectionInfo;
         this.outboundChannel = outboundChannel;
@@ -47,9 +49,7 @@ public class TlsHandler extends ChannelOutboundHandlerAdapter {
 
         if (master.config().getHttpsPorts().contains(connectionInfo.getServerAddr().getPort())) {
             SslHandler sslHandler = sslCtx().newHandler(ctx.alloc());
-            ctx.pipeline()
-               .addBefore(ctx.name(), null, sslHandler)
-               .addBefore(ctx.name(), null, new AlpnHandler(ctx));
+            ctx.pipeline().addBefore(ctx.name(), null, sslHandler).addBefore(ctx.name(), null, new AlpnHandler(ctx));
         } else {
             configHttp1(ctx);
         }

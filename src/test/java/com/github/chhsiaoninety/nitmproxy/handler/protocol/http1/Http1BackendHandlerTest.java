@@ -1,5 +1,14 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.http1;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import com.github.chhsiaoninety.nitmproxy.Address;
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyConfig;
@@ -18,12 +27,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 public class Http1BackendHandlerTest {
     private NitmProxyMaster master;
 
@@ -32,6 +35,16 @@ public class Http1BackendHandlerTest {
     private EmbeddedChannel inboundChannel;
 
     private EmbeddedChannel outboundChannel;
+
+    private static ConnectionInfo connectionInfo() {
+        return new ConnectionInfo(new Address("localhost", 8080), new Address("localhost", 8080));
+    }
+
+    private static byte[] readBytes(ByteBuf byteBuf) {
+        byte[] bytes = new byte[byteBuf.readableBytes()];
+        byteBuf.readBytes(bytes);
+        return bytes;
+    }
 
     @Before
     public void setUp() throws Exception {
@@ -42,10 +55,7 @@ public class Http1BackendHandlerTest {
 
         outboundChannel = new EmbeddedChannel();
 
-        handler = new Http1BackendHandler(
-                master,
-                connectionInfo(),
-                outboundChannel);
+        handler = new Http1BackendHandler(master, connectionInfo(), outboundChannel);
     }
 
     @After
@@ -77,8 +87,7 @@ public class Http1BackendHandlerTest {
     public void shouldHandlerRequestAndResponse() {
         inboundChannel.pipeline().addLast(handler);
 
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
         inboundChannel.write(req);
 
         assertEquals(1, inboundChannel.outboundMessages().size());
@@ -87,8 +96,7 @@ public class Http1BackendHandlerTest {
         assertTrue(outboundReq instanceof ByteBuf);
         assertEquals("GET / HTTP/1.1\r\n\r\n", new String(readBytes((ByteBuf) outboundReq)));
 
-        DefaultFullHttpResponse resp = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        DefaultFullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         assertFalse(inboundChannel.writeInbound(resp));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -101,8 +109,7 @@ public class Http1BackendHandlerTest {
     public void shouldPendingRequests() {
         inboundChannel.pipeline().addLast(handler);
 
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
         // First request
         inboundChannel.write(req.retain());
 
@@ -120,8 +127,7 @@ public class Http1BackendHandlerTest {
     public void shouldHandleRequestsAndResponses() {
         inboundChannel.pipeline().addLast(handler);
 
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
 
         // First request
         inboundChannel.write(req.retain());
@@ -130,8 +136,7 @@ public class Http1BackendHandlerTest {
         assertTrue(inboundChannel.outboundMessages().poll() instanceof ByteBuf);
 
         // First response
-        DefaultFullHttpResponse resp = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        DefaultFullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         assertFalse(inboundChannel.writeInbound(resp));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -156,8 +161,7 @@ public class Http1BackendHandlerTest {
     public void shouldClearPendingRequests() {
         inboundChannel.pipeline().addLast(handler);
 
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
         // First request
         inboundChannel.write(req.retain());
 
@@ -174,17 +178,5 @@ public class Http1BackendHandlerTest {
         inboundChannel.close();
 
         assertEquals(0, req.refCnt());
-    }
-
-    private static ConnectionInfo connectionInfo() {
-        return new ConnectionInfo(
-                new Address("localhost", 8080),
-                new Address("localhost", 8080));
-    }
-
-    private static byte[] readBytes(ByteBuf byteBuf) {
-        byte[] bytes = new byte[byteBuf.readableBytes()];
-        byteBuf.readBytes(bytes);
-        return bytes;
     }
 }

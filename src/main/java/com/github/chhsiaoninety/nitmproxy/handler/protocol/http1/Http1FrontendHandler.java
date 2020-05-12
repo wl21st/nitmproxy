@@ -1,5 +1,10 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.http1;
 
+import static com.google.common.base.Preconditions.checkState;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.github.chhsiaoninety.nitmproxy.Address;
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyMaster;
@@ -7,43 +12,54 @@ import com.github.chhsiaoninety.nitmproxy.enums.Handler;
 import com.github.chhsiaoninety.nitmproxy.enums.ProxyMode;
 import com.github.chhsiaoninety.nitmproxy.event.OutboundChannelClosedEvent;
 import com.google.common.base.Strings;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static com.google.common.base.Preconditions.checkState;
-
 public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     private static final Pattern PATH_PATTERN = Pattern.compile("(https?)://([a-zA-Z0-9\\.\\-]+)(:(\\d+))?(/.*)");
+
     private static final Pattern TUNNEL_ADDR_PATTERN = Pattern.compile("^([a-zA-Z0-9\\.\\-_]+):(\\d+)");
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Http1FrontendHandler.class);
 
     private NitmProxyMaster master;
+
     private ConnectionInfo connectionInfo;
+
     private boolean tunneled;
 
     private Channel outboundChannel;
+
     private ChannelHandler httpServerCodec;
+
     private ChannelHandler httpObjectAggregator;
 
-    public Http1FrontendHandler(NitmProxyMaster master,
-                                ConnectionInfo connectionInfo) {
+    public Http1FrontendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo) {
         this(master, connectionInfo, null, false);
     }
 
-    public Http1FrontendHandler(NitmProxyMaster master,
-                                ConnectionInfo connectionInfo, Channel outboundChannel) {
+    public Http1FrontendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel) {
         this(master, connectionInfo, outboundChannel, true);
     }
 
-    private Http1FrontendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo,
-                                Channel outboundChannel, boolean tunneled) {
+    private Http1FrontendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel,
+        boolean tunneled) {
         super();
         this.master = master;
         this.connectionInfo = connectionInfo;
@@ -58,9 +74,7 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
 
         httpServerCodec = new HttpServerCodec();
         httpObjectAggregator = new HttpObjectAggregator(master.config().getMaxContentLength());
-        ctx.pipeline()
-           .addBefore(ctx.name(), null, httpServerCodec)
-           .addBefore(ctx.name(), null, httpObjectAggregator);
+        ctx.pipeline().addBefore(ctx.name(), null, httpServerCodec).addBefore(ctx.name(), null, httpObjectAggregator);
     }
 
     @Override
@@ -76,8 +90,7 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx,
-                                FullHttpRequest request) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         if (master.config().getProxyMode() == ProxyMode.HTTP && !tunneled) {
             if (request.method() == HttpMethod.CONNECT) {
                 handleTunnelProxyConnection(ctx, request);
@@ -86,9 +99,8 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
             }
         } else {
             checkState(outboundChannel != null);
-            LOGGER.info("[Client ({})] => [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        request);
+            LOGGER.info("[Client ({})] => [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), request);
             outboundChannel.writeAndFlush(ReferenceCountUtil.retain(request));
         }
     }
@@ -107,30 +119,26 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
         ctx.fireUserEventTriggered(evt);
     }
 
-    private void handleTunnelProxyConnection(ChannelHandlerContext ctx,
-                                             FullHttpRequest request) throws Exception {
+    private void handleTunnelProxyConnection(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         Address address = resolveTunnelAddr(request.uri());
         HttpVersion protocolVersion = request.protocolVersion();
-        createOutboundChannel(ctx, address)
-                .addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) throws Exception {
-                        if (future.isSuccess()) {
-                            FullHttpResponse response =
-                                    new DefaultFullHttpResponse(protocolVersion, HttpResponseStatus.OK);
-                            LOGGER.info("[Client ({})] <= [Proxy] : {}", connectionInfo.getClientAddr(), response);
-                            ctx.writeAndFlush(response);
+        createOutboundChannel(ctx, address).addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future) throws Exception {
+                if (future.isSuccess()) {
+                    FullHttpResponse response = new DefaultFullHttpResponse(protocolVersion, HttpResponseStatus.OK);
+                    LOGGER.info("[Client ({})] <= [Proxy] : {}", connectionInfo.getClientAddr(), response);
+                    ctx.writeAndFlush(response);
 
-                            ConnectionInfo newConnInfo = new ConnectionInfo(connectionInfo.getClientAddr(), address);
-                            ctx.pipeline().replace(Http1FrontendHandler.this, null,
-                                                   master.handler(Handler.TLS_FRONTEND, newConnInfo, future.channel()));
-                        }
-                    }
-                });
+                    ConnectionInfo newConnInfo = new ConnectionInfo(connectionInfo.getClientAddr(), address);
+                    ctx.pipeline().replace(Http1FrontendHandler.this, null,
+                        master.handler(Handler.TLS_FRONTEND, newConnInfo, future.channel()));
+                }
+            }
+        });
     }
 
-    private void handleHttpProxyConnection(ChannelHandlerContext ctx,
-                                           FullHttpRequest request) throws Exception {
+    private void handleHttpProxyConnection(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         FullPath fullPath = resolveHttpProxyPath(request.uri());
         Address serverAddr = new Address(fullPath.host, fullPath.port);
         if (outboundChannel != null && !connectionInfo.getServerAddr().equals(serverAddr)) {
@@ -150,8 +158,8 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
         newRequest.headers().set(request.headers());
         newRequest.setUri(fullPath.path);
 
-        LOGGER.info("[Client ({})] => [Server ({})] : {}",
-                connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
+        LOGGER
+            .info("[Client ({})] => [Server ({})] : {}", connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
                 newRequest);
         outboundChannel.writeAndFlush(newRequest);
     }
@@ -187,7 +195,7 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
 
     private ChannelFuture createOutboundChannel(ChannelHandlerContext ctx, Address serverAddr) {
         connectionInfo = new ConnectionInfo(connectionInfo.getClientAddr(),
-                                            new Address(serverAddr.getHost(), serverAddr.getPort()));
+            new Address(serverAddr.getHost(), serverAddr.getPort()));
         ChannelFuture future = master.connect(ctx, connectionInfo, new ChannelInitializer<Channel>() {
             @Override
             protected void initChannel(Channel ch) throws Exception {
@@ -207,8 +215,11 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
 
     private static class FullPath {
         private String scheme;
+
         private String host;
+
         private int port;
+
         private String path;
 
         private FullPath(String scheme, String host, int port, String path) {
@@ -220,12 +231,8 @@ public class Http1FrontendHandler extends SimpleChannelInboundHandler<FullHttpRe
 
         @Override
         public String toString() {
-            return "FullPath{" +
-                   "scheme='" + scheme + '\'' +
-                   ", host='" + host + '\'' +
-                   ", port=" + port +
-                   ", path='" + path + '\'' +
-                   '}';
+            return "FullPath{" + "scheme='" + scheme + '\'' + ", host='" + host + '\'' + ", port=" + port + ", path='"
+                + path + '\'' + '}';
         }
     }
 }

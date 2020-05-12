@@ -4,6 +4,7 @@ import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 
 public class OutboundChannelClosedEvent {
     private ConnectionInfo connectionInfo;
+
     private boolean client;
 
     public OutboundChannelClosedEvent(ConnectionInfo connectionInfo, boolean client) {

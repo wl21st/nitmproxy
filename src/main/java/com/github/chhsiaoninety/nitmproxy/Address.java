@@ -2,6 +2,7 @@ package com.github.chhsiaoninety.nitmproxy;
 
 public class Address {
     private String host;
+
     private int port;
 
     public Address(String host, int port) {
@@ -31,13 +32,13 @@ public class Address {
         if (port != address.port) {
             return false;
         }
-        return host != null? host.equals(address.host) : address.host == null;
+        return host != null ? host.equals(address.host) : address.host == null;
 
     }
 
     @Override
     public int hashCode() {
-        int result = host != null? host.hashCode() : 0;
+        int result = host != null ? host.hashCode() : 0;
         result = 31 * result + port;
         return result;
     }

@@ -1,5 +1,9 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.http1;
 
+import java.io.IOException;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
+
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyMaster;
 import com.github.chhsiaoninety.nitmproxy.event.OutboundChannelClosedEvent;
@@ -17,10 +21,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Deque;
-import java.util.concurrent.ConcurrentLinkedDeque;
-
 public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject> {
     private static final Logger LOGGER = LoggerFactory.getLogger(Http1BackendHandler.class);
 
@@ -28,14 +28,14 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
     private NitmProxyMaster master;
 
     private ConnectionInfo connectionInfo;
+
     private Channel outboundChannel;
 
     private DelayOutboundHandler delayOutboundHandler;
 
     private volatile HttpRequest currentRequest;
 
-    public Http1BackendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo,
-                               Channel outboundChannel) {
+    public Http1BackendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel) {
         this.master = master;
         this.connectionInfo = connectionInfo;
         this.outboundChannel = outboundChannel;
@@ -60,17 +60,15 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         LOGGER.info("{} : handlerAdded", connectionInfo);
 
-        ctx.pipeline()
-           .addBefore(ctx.name(), null, new HttpClientCodec())
-           .addBefore(ctx.name(), null, delayOutboundHandler);
+        ctx.pipeline().addBefore(ctx.name(), null, new HttpClientCodec())
+            .addBefore(ctx.name(), null, delayOutboundHandler);
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject httpObject)
-            throws Exception {
-        LOGGER.info("[Client ({})] <= [Server ({})] : {}",
-                    connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                    httpObject);
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, HttpObject httpObject) throws Exception {
+        LOGGER
+            .info("[Client ({})] <= [Server ({})] : {}", connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
+                httpObject);
 
         outboundChannel.writeAndFlush(ReferenceCountUtil.retain(httpObject));
 
@@ -80,8 +78,20 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
         }
     }
 
+    private static class RequestPromise {
+        private HttpRequest request;
+
+        private ChannelPromise promise;
+
+        private RequestPromise(HttpRequest request, ChannelPromise promise) {
+            this.request = request;
+            this.promise = promise;
+        }
+    }
+
     private class DelayOutboundHandler extends ChannelOutboundHandlerAdapter {
         private Deque<RequestPromise> pendings = new ConcurrentLinkedDeque<>();
+
         private ChannelHandlerContext thisCtx;
 
         @Override
@@ -92,9 +102,8 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
             if (msg instanceof FullHttpRequest) {
-                LOGGER.info("[Client ({})] => [Server ({})] : (PENDING) {}",
-                            connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                            msg);
+                LOGGER.info("[Client ({})] => [Server ({})] : (PENDING) {}", connectionInfo.getClientAddr(),
+                    connectionInfo.getServerAddr(), msg);
                 HttpRequest request = (HttpRequest) msg;
                 pendings.offer(new RequestPromise(request, promise));
                 next();
@@ -112,9 +121,8 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
 
             RequestPromise requestPromise = pendings.poll();
             currentRequest = requestPromise.request;
-            LOGGER.info("[Client ({})] => [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        requestPromise.request);
+            LOGGER.info("[Client ({})] => [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), requestPromise.request);
 
             thisCtx.writeAndFlush(requestPromise.request, requestPromise.promise);
         }
@@ -126,16 +134,6 @@ public class Http1BackendHandler extends SimpleChannelInboundHandler<HttpObject>
                 requestPromise.promise.setFailure(new IOException("Cannot send request to server"));
                 ReferenceCountUtil.release(requestPromise.request);
             }
-        }
-    }
-
-    private static class RequestPromise {
-        private HttpRequest request;
-        private ChannelPromise promise;
-
-        private RequestPromise(HttpRequest request, ChannelPromise promise) {
-            this.request = request;
-            this.promise = promise;
         }
     }
 }

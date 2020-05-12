@@ -1,5 +1,9 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.http2;
 
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.regex.Pattern;
+
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyMaster;
 import io.netty.channel.Channel;
@@ -23,18 +27,17 @@ import io.netty.handler.logging.LogLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Deque;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.regex.Pattern;
-
 public class Http2FrontendHandler extends ChannelInboundHandlerAdapter {
     private static final Pattern PATH_PATTERN = Pattern.compile("(https?)://([a-zA-Z0-9\\.\\-]+)(:(\\d+))?(/.*)");
+
     private static final Pattern TUNNEL_ADDR_PATTERN = Pattern.compile("^([a-zA-Z0-9\\.\\-_]+):(\\d+)");
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Http2FrontendHandler.class);
 
     private NitmProxyMaster master;
+
     private ConnectionInfo connectionInfo;
+
     private Channel outboundChannel;
 
     public Http2FrontendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel) {
@@ -48,19 +51,12 @@ public class Http2FrontendHandler extends ChannelInboundHandlerAdapter {
         LOGGER.info("{} : handlerAdded", connectionInfo);
 
         Http2Connection connection = new DefaultHttp2Connection(true);
-        ChannelHandler http2ConnHandler = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(new DelegatingDecompressorFrameListener(
-                        connection,
-                        new InboundHttp2ToHttpAdapterBuilder(connection)
-                                .maxContentLength(master.config().getMaxContentLength())
-                                .propagateSettings(true)
-                                .build()))
-                .connection(connection)
-                .frameLogger(new Http2FrameLogger(LogLevel.DEBUG))
-                .build();
-        ctx.pipeline()
-           .addBefore(ctx.name(), null, http2ConnHandler)
-           .addBefore(ctx.name(), null, new Http2Handler());
+        ChannelHandler http2ConnHandler = new HttpToHttp2ConnectionHandlerBuilder().frameListener(
+            new DelegatingDecompressorFrameListener(connection,
+                new InboundHttp2ToHttpAdapterBuilder(connection).maxContentLength(master.config().getMaxContentLength())
+                    .propagateSettings(true).build())).connection(connection)
+            .frameLogger(new Http2FrameLogger(LogLevel.DEBUG)).build();
+        ctx.pipeline().addBefore(ctx.name(), null, http2ConnHandler).addBefore(ctx.name(), null, new Http2Handler());
     }
 
     @Override
@@ -74,13 +70,12 @@ public class Http2FrontendHandler extends ChannelInboundHandlerAdapter {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            LOGGER.info("[Client ({})] => [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        msg);
+            LOGGER.info("[Client ({})] => [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), msg);
 
             if (msg instanceof FullHttpRequest) {
-                String streamId = ((HttpRequest) msg).headers().get(
-                        HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
+                String streamId = ((HttpRequest) msg).headers()
+                    .get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
                 if (streamId == null) {
                     throw new IllegalStateException("No streamId");
                 }
@@ -94,9 +89,8 @@ public class Http2FrontendHandler extends ChannelInboundHandlerAdapter {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            LOGGER.info("[Client ({})] <= [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        msg);
+            LOGGER.info("[Client ({})] <= [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), msg);
 
             if (msg instanceof HttpResponse) {
                 HttpResponse response = (HttpResponse) msg;
@@ -104,8 +98,7 @@ public class Http2FrontendHandler extends ChannelInboundHandlerAdapter {
                     if (streams.isEmpty()) {
                         throw new IllegalStateException("No active streams");
                     }
-                    response.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(),
-                                           streams.poll());
+                    response.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), streams.poll());
                 }
             }
 

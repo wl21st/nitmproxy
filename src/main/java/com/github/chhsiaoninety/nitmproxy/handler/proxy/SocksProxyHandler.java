@@ -1,5 +1,8 @@
 package com.github.chhsiaoninety.nitmproxy.handler.proxy;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.github.chhsiaoninety.nitmproxy.Address;
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyMaster;
@@ -33,19 +36,16 @@ import io.netty.handler.codec.socksx.v5.Socks5ServerEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage> {
     private static final Logger LOGGER = LoggerFactory.getLogger(SocksProxyHandler.class);
 
     private NitmProxyMaster master;
+
     private ConnectionInfo connectionInfo;
 
     private List<ChannelHandler> handlers;
 
-    public SocksProxyHandler(NitmProxyMaster master,
-                             ConnectionInfo connectionInfo) {
+    public SocksProxyHandler(NitmProxyMaster master, ConnectionInfo connectionInfo) {
         this.master = master;
         this.connectionInfo = connectionInfo;
 
@@ -57,7 +57,8 @@ public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage>
         LOGGER.info("{} : handlerAdded", connectionInfo.toString(true));
 
         Socks5ServerEncoder socks5ServerEncoder = new Socks5ServerEncoder(Socks5AddressEncoder.DEFAULT);
-        SocksPortUnificationServerHandler socksPortUnificationServerHandler = new SocksPortUnificationServerHandler(socks5ServerEncoder);
+        SocksPortUnificationServerHandler socksPortUnificationServerHandler = new SocksPortUnificationServerHandler(
+            socks5ServerEncoder);
         ctx.pipeline().addBefore(ctx.name(), null, socksPortUnificationServerHandler);
     }
 
@@ -70,8 +71,7 @@ public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage>
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, SocksMessage socksMessage)
-            throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, SocksMessage socksMessage) throws Exception {
         switch (socksMessage.version()) {
         case SOCKS4a:
             Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksMessage;
@@ -116,18 +116,14 @@ public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage>
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
                 if (future.isSuccess()) {
-                    ConnectionInfo newConnectionInfo = new ConnectionInfo(
-                            connectionInfo.getClientAddr(), serverAddr);
-                    ctx.writeAndFlush(new DefaultSocks4CommandResponse(
-                            Socks4CommandStatus.SUCCESS,
-                            request.dstAddr(),
-                            request.dstPort()));
+                    ConnectionInfo newConnectionInfo = new ConnectionInfo(connectionInfo.getClientAddr(), serverAddr);
+                    ctx.writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.SUCCESS, request.dstAddr(),
+                        request.dstPort()));
 
                     onServerConnected(ctx, newConnectionInfo, future.channel());
                 } else {
-                    ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(
-                            Socks4CommandStatus.REJECTED_OR_FAILED,
-                            request.dstAddr(),
+                    ctx.channel().writeAndFlush(
+                        new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED, request.dstAddr(),
                             request.dstPort()));
                     ctx.close();
                 }
@@ -141,21 +137,16 @@ public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage>
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
                 if (future.isSuccess()) {
-                    ConnectionInfo newConnectionInfo = new ConnectionInfo(
-                            connectionInfo.getClientAddr(), serverAddr);
-                    ctx.writeAndFlush(new DefaultSocks5CommandResponse(
-                            Socks5CommandStatus.SUCCESS,
-                            request.dstAddrType(),
-                            request.dstAddr(),
-                            request.dstPort()));
+                    ConnectionInfo newConnectionInfo = new ConnectionInfo(connectionInfo.getClientAddr(), serverAddr);
+                    ctx.writeAndFlush(
+                        new DefaultSocks5CommandResponse(Socks5CommandStatus.SUCCESS, request.dstAddrType(),
+                            request.dstAddr(), request.dstPort()));
 
                     onServerConnected(ctx, newConnectionInfo, future.channel());
                 } else {
-                    ctx.channel().writeAndFlush(new DefaultSocks5CommandResponse(
-                            Socks5CommandStatus.FAILURE,
-                            request.dstAddrType(),
-                            request.dstAddr(),
-                            request.dstPort()));
+                    ctx.channel().writeAndFlush(
+                        new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType(),
+                            request.dstAddr(), request.dstPort()));
                     ctx.close();
                 }
             }
@@ -164,12 +155,12 @@ public class SocksProxyHandler extends SimpleChannelInboundHandler<SocksMessage>
 
     private void onServerConnected(ChannelHandlerContext ctx, ConnectionInfo connectionInfo, Channel outboundChannel) {
         ctx.pipeline().replace(SocksProxyHandler.this, null,
-                               master.handler(Handler.TLS_FRONTEND, connectionInfo, outboundChannel));
+            master.handler(Handler.TLS_FRONTEND, connectionInfo, outboundChannel));
     }
 
     private ChannelFuture createServerChannel(ChannelHandlerContext ctx, Address serverAddr) {
-        ConnectionInfo newConnectionInfo = new ConnectionInfo(
-                connectionInfo.getClientAddr(), new Address(serverAddr.getHost(), serverAddr.getPort()));
+        ConnectionInfo newConnectionInfo = new ConnectionInfo(connectionInfo.getClientAddr(),
+            new Address(serverAddr.getHost(), serverAddr.getPort()));
         return master.connect(ctx, newConnectionInfo, new ChannelInitializer<Channel>() {
             @Override
             protected void initChannel(Channel channel) throws Exception {

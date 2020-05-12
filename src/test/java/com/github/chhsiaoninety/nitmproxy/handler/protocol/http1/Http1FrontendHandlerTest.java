@@ -1,5 +1,16 @@
 package com.github.chhsiaoninety.nitmproxy.handler.protocol.http1;
 
+import static com.github.chhsiaoninety.nitmproxy.HttpObjectUtil.requestBytes;
+import static io.netty.util.ReferenceCountUtil.release;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.github.chhsiaoninety.nitmproxy.Address;
 import com.github.chhsiaoninety.nitmproxy.ConnectionInfo;
 import com.github.chhsiaoninety.nitmproxy.NitmProxyConfig;
@@ -8,15 +19,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import static com.github.chhsiaoninety.nitmproxy.HttpObjectUtil.*;
-import static io.netty.util.ReferenceCountUtil.*;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 public class Http1FrontendHandlerTest {
     private NitmProxyMaster master;
@@ -24,6 +35,10 @@ public class Http1FrontendHandlerTest {
     private EmbeddedChannel inboundChannel;
 
     private EmbeddedChannel outboundChannel;
+
+    private static ConnectionInfo connectionInfo() {
+        return new ConnectionInfo(new Address("localhost", 8080), new Address("localhost", 8080));
+    }
 
     @Before
     public void setUp() throws Exception {
@@ -84,8 +99,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(true);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf requestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
+        ByteBuf requestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
         assertFalse(inboundChannel.writeInbound(requestBytes));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -103,8 +118,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(true);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf requestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
+        ByteBuf requestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
         assertFalse(inboundChannel.writeInbound(requestBytes.copy()));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -134,8 +149,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(true);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf firstRequestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
+        ByteBuf firstRequestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
         assertFalse(inboundChannel.writeInbound(firstRequestBytes));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -150,8 +165,8 @@ public class Http1FrontendHandlerTest {
         EmbeddedChannel firstOutboundChannel = outboundChannel;
 
         // Second request
-        ByteBuf secondRequestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
+        ByteBuf secondRequestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:9000/"));
         assertFalse(inboundChannel.writeInbound(secondRequestBytes));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -172,8 +187,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(false);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf firstRequestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
+        ByteBuf firstRequestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
         assertFalse(inboundChannel.writeInbound(firstRequestBytes));
 
         assertFalse(inboundChannel.isActive());
@@ -184,8 +199,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(true);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf firstRequestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
+        ByteBuf firstRequestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
         assertFalse(inboundChannel.writeInbound(firstRequestBytes));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -201,8 +216,8 @@ public class Http1FrontendHandlerTest {
         outboundChannel.close();
 
         // Second request
-        ByteBuf secondRequestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
+        ByteBuf secondRequestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "http://localhost:8000/"));
         assertFalse(inboundChannel.writeInbound(secondRequestBytes));
 
         assertEquals(1, outboundChannel.outboundMessages().size());
@@ -222,8 +237,8 @@ public class Http1FrontendHandlerTest {
         Http1FrontendHandler handler = httpProxyHandler(true);
         inboundChannel.pipeline().addLast(handler);
 
-        ByteBuf requestBytes = requestBytes(new DefaultHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.CONNECT, "localhost:8000"));
+        ByteBuf requestBytes = requestBytes(
+            new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.CONNECT, "localhost:8000"));
         assertFalse(inboundChannel.writeInbound(requestBytes));
 
         assertNotNull(outboundChannel);
@@ -241,14 +256,13 @@ public class Http1FrontendHandlerTest {
 
     private Http1FrontendHandler httpProxyHandler(boolean outboundAvailable) {
         if (outboundAvailable) {
-            when(master.connect(any(), any(), any())).then(
-                    invocationOnMock ->  {
-                        outboundChannel = new EmbeddedChannel((ChannelHandler) invocationOnMock.getArguments()[2]);
-                        return outboundChannel.newSucceededFuture();
-                    });
+            when(master.connect(any(), any(), any())).then(invocationOnMock -> {
+                outboundChannel = new EmbeddedChannel((ChannelHandler) invocationOnMock.getArguments()[2]);
+                return outboundChannel.newSucceededFuture();
+            });
         } else {
-            when(master.connect(any(), any(), any())).then(
-                    invocationOnMock ->  inboundChannel.newPromise().setFailure(new Exception()));
+            when(master.connect(any(), any(), any()))
+                .then(invocationOnMock -> inboundChannel.newPromise().setFailure(new Exception()));
         }
         return new Http1FrontendHandler(master, connectionInfo());
     }
@@ -256,11 +270,5 @@ public class Http1FrontendHandlerTest {
     private Http1FrontendHandler tunneledHandler() {
         outboundChannel = new EmbeddedChannel();
         return new Http1FrontendHandler(master, connectionInfo(), outboundChannel);
-    }
-
-    private static ConnectionInfo connectionInfo() {
-        return new ConnectionInfo(
-                new Address("localhost", 8080),
-                new Address("localhost", 8080));
     }
 }

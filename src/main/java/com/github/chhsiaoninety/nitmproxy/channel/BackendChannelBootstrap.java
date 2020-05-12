@@ -9,12 +9,9 @@ import io.netty.channel.ChannelHandlerContext;
 
 public class BackendChannelBootstrap {
     public ChannelFuture connect(ChannelHandlerContext fromCtx, NitmProxyMaster master, ConnectionInfo connectionInfo,
-                                 ChannelHandler handler) {
-        return new Bootstrap()
-                .group(fromCtx.channel().eventLoop())
-                .channel(fromCtx.channel().getClass())
-                .handler(handler)
-                .connect(connectionInfo.getServerAddr().getHost(),
-                         connectionInfo.getServerAddr().getPort());
+        ChannelHandler handler) {
+        return new Bootstrap().group(fromCtx.channel().eventLoop()).channel(fromCtx.channel().getClass())
+            .handler(handler)
+            .connect(connectionInfo.getServerAddr().getHost(), connectionInfo.getServerAddr().getPort());
     }
 }

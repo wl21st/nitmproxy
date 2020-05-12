@@ -27,11 +27,12 @@ public class Http2BackendHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOGGER = LoggerFactory.getLogger(Http2BackendHandler.class);
 
     private NitmProxyMaster master;
+
     private ConnectionInfo connectionInfo;
+
     private Channel outboundChannel;
 
-    public Http2BackendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo,
-                               Channel outboundChannel) {
+    public Http2BackendHandler(NitmProxyMaster master, ConnectionInfo connectionInfo, Channel outboundChannel) {
         this.master = master;
         this.connectionInfo = connectionInfo;
         this.outboundChannel = outboundChannel;
@@ -53,35 +54,26 @@ public class Http2BackendHandler extends ChannelInboundHandlerAdapter {
         LOGGER.info("{} : handlerAdded", connectionInfo);
 
         Http2Connection connection = new DefaultHttp2Connection(false);
-        ChannelHandler http2ConnHandler = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(new DelegatingDecompressorFrameListener(
-                        connection,
-                        new InboundHttp2ToHttpAdapterBuilder(connection)
-                                .maxContentLength(master.config().getMaxContentLength())
-                                .propagateSettings(true)
-                                .build()))
-                .frameLogger(new Http2FrameLogger(LogLevel.DEBUG))
-                .connection(connection)
-                .build();
-        ctx.pipeline()
-           .addBefore(ctx.name(), null, http2ConnHandler)
-           .addBefore(ctx.name(), null, new Http2Handler());
+        ChannelHandler http2ConnHandler = new HttpToHttp2ConnectionHandlerBuilder().frameListener(
+            new DelegatingDecompressorFrameListener(connection,
+                new InboundHttp2ToHttpAdapterBuilder(connection).maxContentLength(master.config().getMaxContentLength())
+                    .propagateSettings(true).build())).frameLogger(new Http2FrameLogger(LogLevel.DEBUG))
+            .connection(connection).build();
+        ctx.pipeline().addBefore(ctx.name(), null, http2ConnHandler).addBefore(ctx.name(), null, new Http2Handler());
     }
 
     private class Http2Handler extends ChannelDuplexHandler {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            LOGGER.info("[Client ({})] <= [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        msg);
+            LOGGER.info("[Client ({})] <= [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), msg);
             outboundChannel.writeAndFlush(msg);
         }
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            LOGGER.info("[Client ({})] => [Server ({})] : {}",
-                        connectionInfo.getClientAddr(), connectionInfo.getServerAddr(),
-                        msg);
+            LOGGER.info("[Client ({})] => [Server ({})] : {}", connectionInfo.getClientAddr(),
+                connectionInfo.getServerAddr(), msg);
             if (msg instanceof FullHttpRequest) {
                 HttpMessage httpMessage = (HttpRequest) msg;
                 httpMessage.headers().add(ExtensionHeaderNames.SCHEME.text(), "https");

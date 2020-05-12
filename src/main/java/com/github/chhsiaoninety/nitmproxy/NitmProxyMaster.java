@@ -11,12 +11,13 @@ import io.netty.channel.ChannelHandlerContext;
 
 public class NitmProxyMaster {
     private NitmProxyConfig config;
+
     private HandlerProvider handlerProvider;
+
     private BackendChannelBootstrap backendChannelBootstrap;
 
-    public NitmProxyMaster(NitmProxyConfig config,
-                           HandlerProvider handlerProvider,
-                           BackendChannelBootstrap backendChannelBootstrap) {
+    public NitmProxyMaster(NitmProxyConfig config, HandlerProvider handlerProvider,
+        BackendChannelBootstrap backendChannelBootstrap) {
         this.config = config;
         this.handlerProvider = handlerProvider;
         this.backendChannelBootstrap = backendChannelBootstrap;
@@ -26,8 +27,7 @@ public class NitmProxyMaster {
         return config;
     }
 
-    public ChannelHandler handler(Handler handler, ConnectionInfo connectionInfo,
-                                  Channel outboundChannel) {
+    public ChannelHandler handler(Handler handler, ConnectionInfo connectionInfo, Channel outboundChannel) {
         switch (handler) {
         case HTTP1_BACKEND:
             return handlerProvider.http1BackendHandler(this, connectionInfo, outboundChannel);
@@ -61,8 +61,7 @@ public class NitmProxyMaster {
         }
     }
 
-    public ChannelFuture connect(ChannelHandlerContext fromCtx, ConnectionInfo connectionInfo,
-                                 ChannelHandler handler) {
+    public ChannelFuture connect(ChannelHandlerContext fromCtx, ConnectionInfo connectionInfo, ChannelHandler handler) {
         return backendChannelBootstrap.connect(fromCtx, this, connectionInfo, handler);
     }
 }

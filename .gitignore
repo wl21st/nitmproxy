@@ -27,7 +27,8 @@ buildNumber.properties
 # PEM
 key.pem
 server.pem
-/.idea/sonarlint/issuestore/
+/.idea
 /nitmproxy.iml
 /nitmproxy.ipr
 /nitmproxy.iws
+

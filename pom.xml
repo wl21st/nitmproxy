@@ -20,11 +20,11 @@
         <commons-cli.version>1.4</commons-cli.version>
         <junit.version>4.13</junit.version>
         <mockito.version>1.10.19</mockito.version>
-        <jetty.alpnAgent.version>2.0.8</jetty.alpnAgent.version>
-        <jetty.alpnAgent.path>
-            "${settings.localRepository}"/org/mortbay/jetty/alpn/jetty-alpn-agent/${jetty.alpnAgent.version}/jetty-alpn-agent-${jetty.alpnAgent.version}.jar
-        </jetty.alpnAgent.path>
-        <argLine.alpnAgent>-javaagent:${jetty.alpnAgent.path}</argLine.alpnAgent>
+<!--        <jetty.alpnAgent.version>2.0.8</jetty.alpnAgent.version>-->
+<!--        <jetty.alpnAgent.path>-->
+<!--            "${settings.localRepository}"/org/mortbay/jetty/alpn/jetty-alpn-agent/${jetty.alpnAgent.version}/jetty-alpn-agent-${jetty.alpnAgent.version}.jar-->
+<!--        </jetty.alpnAgent.path>-->
+<!--        <argLine.alpnAgent>-javaagent:${jetty.alpnAgent.path}</argLine.alpnAgent>-->
         <argLine.leak>-D_</argLine.leak>
         <argLine.coverage>-D_</argLine.coverage>
         <main.class>com.github.chhsiaoninety.nitmproxy.NitmProxy</main.class>
@@ -38,7 +38,6 @@
                 <configuration>
                     <executable>${java.home}/bin/java</executable>
                     <commandlineArgs>
-                        ${argLine.alpnAgent}
                         -classpath %classpath
                         ${argLine.leak}
                         ${main.class}
@@ -49,7 +48,7 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>${argLine.leak} ${argLine.alpnAgent} ${argLine.coverage}</argLine>
+                    <argLine>${argLine.leak} ${argLine.coverage}</argLine>
                 </configuration>
             </plugin>
         </plugins>
